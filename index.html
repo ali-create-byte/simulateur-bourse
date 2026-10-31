@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulateur Bourse de Casablanca</title>
+<style>
+  :root {
+    --bg: #f4f6f5;
+    --card: #ffffff;
+    --text: #15201c;
+    --muted: #5d6b66;
+    --border: #e1e7e4;
+    --primary: #0f766e;
+    --primary-soft: #e3f2ef;
+    --accent: #c1272d;
+    --invested: #8a97a6;
+    --savings: #d08a1e;
+    --good: #0f7a3d;
+    --bad: #b42318;
+    --shadow: 0 1px 2px rgba(16, 24, 20, .05), 0 4px 16px rgba(16, 24, 20, .05);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1513;
+      --card: #18211e;
+      --text: #e8efec;
+      --muted: #9aaba4;
+      --border: #2a3632;
+      --primary: #2bb3a3;
+      --primary-soft: #16302c;
+      --accent: #ef5b60;
+      --invested: #8d9aa9;
+      --savings: #e6a540;
+      --good: #43c27a;
+      --bad: #f2786d;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, #0b5d56, #0f766e 60%, #138a7f);
+    color: #fff;
+    padding: 28px 16px 64px;
+  }
+  header .wrap { max-width: 1180px; margin: 0 auto; }
+  header h1 { margin: 0 0 4px; font-size: clamp(1.4rem, 3.5vw, 2rem); letter-spacing: -.01em; }
+  header p { margin: 0; opacity: .85; max-width: 60ch; }
+  main {
+    max-width: 1180px;
+    margin: -44px auto 0;
+    padding: 0 16px 40px;
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+  .inputs { position: sticky; top: 16px; }
+  @media (max-width: 900px) { .inputs { position: static; } }
+  .inputs h2, .card h2 { font-size: 1.05rem; margin: 0 0 14px; }
+  fieldset { border: 0; margin: 0 0 18px; padding: 0; }
+  legend {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--primary);
+    margin-bottom: 10px;
+    padding: 0;
+  }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: .88rem; font-weight: 500; margin-bottom: 4px; }
+  .field .hint { font-size: .76rem; color: var(--muted); margin-top: 3px; }
+  .input-wrap { position: relative; }
+  .input-wrap input {
+    width: 100%;
+    font: inherit;
+    font-size: 16px; /* évite le zoom iOS */
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 56px 9px 12px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .input-wrap input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .input-wrap input.invalid { border-color: var(--bad); }
+  .input-wrap .unit {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: .85rem; pointer-events: none;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .segmented {
+    display: grid; grid-template-columns: 1fr 1fr;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px;
+  }
+  .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+  .segmented label {
+    text-align: center; padding: 7px 0; border-radius: 8px; cursor: pointer;
+    font-size: .9rem; font-weight: 500; color: var(--muted); margin: 0;
+  }
+  .segmented input:checked + label { background: var(--card); color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .segmented input:focus-visible + label { outline: 2px solid var(--primary); }
+  button.reset {
+    width: 100%; font: inherit; font-weight: 600; cursor: pointer;
+    background: transparent; color: var(--primary);
+    border: 1px solid var(--primary); border-radius: 10px; padding: 9px;
+  }
+  button.reset:hover { background: var(--primary-soft); }
+
+  .results { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
+  .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .kpi {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 14px 16px; min-width: 0;
+  }
+  .kpi .label { font-size: .78rem; color: var(--muted); }
+  .kpi .value { font-size: clamp(1.05rem, 2.4vw, 1.35rem); font-weight: 700; margin-top: 2px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .kpi .sub { font-size: .76rem; color: var(--muted); margin-top: 2px; }
+  .kpi.highlight { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .kpi.highlight .label, .kpi.highlight .sub { color: rgba(255,255,255,.82); }
+
+  .chart-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 10px; }
+  .chart-head h2 { margin: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .82rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+  .chart-box { position: relative; height: 300px; }
+  @media (max-width: 640px) { .chart-box { height: 240px; } }
+  canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: pan-y; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 2;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.14); padding: 8px 10px; font-size: .8rem;
+    white-space: nowrap; opacity: 0; transition: opacity .1s;
+  }
+  .tooltip b { display: block; margin-bottom: 2px; }
+  .tooltip .tt-row { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .tooltip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  .scenarios { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 640px) { .scenarios { grid-template-columns: minmax(0, 1fr); } }
+  .scenario { border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .scenario.mid { border-color: var(--primary); background: var(--primary-soft); }
+  .scenario h3 { margin: 0; font-size: .95rem; }
+  .scenario .rate { font-size: .78rem; color: var(--muted); margin-bottom: 8px; }
+  .scenario .big { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .scenario dl { margin: 8px 0 0; display: grid; grid-template-columns: auto auto; gap: 2px 8px; font-size: .82rem; }
+  .scenario dt { color: var(--muted); }
+  .scenario dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 520px) { .compare { grid-template-columns: minmax(0, 1fr); } }
+  .compare .box { border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .compare .box .label { font-size: .8rem; color: var(--muted); }
+  .compare .box .big { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .compare .verdict { grid-column: 1 / -1; padding: 12px 14px; border-radius: 12px; background: var(--primary-soft); font-size: .9rem; }
+
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 0 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; font-variant-numeric: tabular-nums; min-width: 760px; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
+  th { font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  tbody tr:hover td { background: var(--primary-soft); }
+  tfoot td { font-weight: 700; border-bottom: 0; }
+
+  .breakdown { margin-top: 14px; font-size: .84rem; color: var(--muted); }
+  .breakdown summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+  .breakdown dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 10px 0 0; }
+  .breakdown dd { margin: 0; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+
+  .warning {
+    border-left: 4px solid var(--accent);
+    background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 14px 16px; font-size: .86rem; color: var(--muted);
+  }
+  .warning strong { color: var(--text); }
+  .warning ul { margin: 6px 0 0; padding-left: 18px; }
+  .pos { color: var(--good); }
+  .neg { color: var(--bad); }
+  footer { text-align: center; font-size: .78rem; color: var(--muted); padding: 0 16px 30px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Simulateur d'investissement — Bourse de Casablanca</h1>
+    <p>Estimez l'évolution d'un portefeuille d'actions marocaines en tenant compte des frais de courtage, des droits de garde et de la fiscalité marocaine.</p>
+  </div>
+</header>
+
+<main>
+  <!-- ===== Paramètres ===== -->
+  <form class="card inputs" id="form" autocomplete="off" onsubmit="return false">
+    <h2>Paramètres</h2>
+
+    <fieldset>
+      <legend>Investissement</legend>
+      <div class="field">
+        <label for="capital">Capital initial</label>
+        <div class="input-wrap"><input id="capital" inputmode="decimal" value="20000"><span class="unit">MAD</span></div>
+      </div>
+      <div class="field">
+        <label for="monthly">Versement mensuel</label>
+        <div class="input-wrap"><input id="monthly" inputmode="decimal" value="1000"><span class="unit">MAD</span></div>
+      </div>
+      <div class="field">
+        <label for="years">Durée</label>
+        <div class="input-wrap"><input id="years" inputmode="numeric" value="15"><span class="unit">ans</span></div>
+        <div class="hint">Entre 1 et 50 ans.</div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Rendements</legend>
+      <div class="row2">
+        <div class="field">
+          <label for="priceRate">Hausse du cours</label>
+          <div class="input-wrap"><input id="priceRate" inputmode="decimal" value="7"><span class="unit">%/an</span></div>
+        </div>
+        <div class="field">
+          <label for="divYield">Dividende</label>
+          <div class="input-wrap"><input id="divYield" inputmode="decimal" value="3,5"><span class="unit">%/an</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label id="reinvestLabel">Réinvestir les dividendes</label>
+        <div class="segmented" role="radiogroup" aria-labelledby="reinvestLabel">
+          <input type="radio" name="reinvest" id="reinvestYes" value="1" checked><label for="reinvestYes">Oui</label>
+          <input type="radio" name="reinvest" id="reinvestNo" value="0"><label for="reinvestNo">Non</label>
+        </div>
+        <div class="hint">Si non, les dividendes nets sont conservés en espèces (sans intérêts).</div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Frais</legend>
+      <div class="row2">
+        <div class="field">
+          <label for="orderFee">Frais par ordre</label>
+          <div class="input-wrap"><input id="orderFee" inputmode="decimal" value="0,7"><span class="unit">% TTC</span></div>
+        </div>
+        <div class="field">
+          <label for="custody">Droits de garde</label>
+          <div class="input-wrap"><input id="custody" inputmode="decimal" value="0"><span class="unit">MAD/an</span></div>
+        </div>
+      </div>
+      <div class="hint">Frais appliqués à chaque achat (versement, réinvestissement) et à la vente finale.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Fiscalité marocaine</legend>
+      <div class="row2">
+        <div class="field">
+          <label for="divTax">Retenue dividendes</label>
+          <div class="input-wrap"><input id="divTax" inputmode="decimal" value="10"><span class="unit">%</span></div>
+        </div>
+        <div class="field">
+          <label for="cgTax">Impôt plus-values</label>
+          <div class="input-wrap"><input id="cgTax" inputmode="decimal" value="15"><span class="unit">%</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="exemption">Seuil d'exonération des ventes annuelles</label>
+        <div class="input-wrap"><input id="exemption" inputmode="decimal" value="30000"><span class="unit">MAD</span></div>
+        <div class="hint">Plus-value exonérée si le total des ventes de l'année ne dépasse pas ce seuil.</div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Scénarios &amp; comparaison</legend>
+      <div class="field">
+        <label for="spread">Écart des scénarios (± sur la hausse du cours)</label>
+        <div class="input-wrap"><input id="spread" inputmode="decimal" value="3"><span class="unit">pts</span></div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="savingsRate">Taux livret (brut)</label>
+          <div class="input-wrap"><input id="savingsRate" inputmode="decimal" value="2"><span class="unit">%/an</span></div>
+        </div>
+        <div class="field">
+          <label for="savingsTax">Impôt intérêts</label>
+          <div class="input-wrap"><input id="savingsTax" inputmode="decimal" value="20"><span class="unit">%</span></div>
+        </div>
+      </div>
+    </fieldset>
+
+    <button type="button" class="reset" id="reset">Réinitialiser les valeurs</button>
+  </form>
+
+  <!-- ===== Résultats ===== -->
+  <div class="results">
+    <section class="kpis" aria-label="Résultats principaux">
+      <div class="kpi"><div class="label">Total investi</div><div class="value" id="kInvested">–</div><div class="sub" id="kInvestedSub"></div></div>
+      <div class="kpi"><div class="label">Valeur finale (avant vente)</div><div class="value" id="kFinal">–</div><div class="sub" id="kFinalSub"></div></div>
+      <div class="kpi"><div class="label">Frais payés</div><div class="value" id="kFees">–</div><div class="sub" id="kFeesSub"></div></div>
+      <div class="kpi"><div class="label">Impôts payés</div><div class="value" id="kTax">–</div><div class="sub" id="kTaxSub"></div></div>
+      <div class="kpi highlight"><div class="label">Valeur nette après vente et impôts</div><div class="value" id="kNet">–</div><div class="sub" id="kNetSub"></div></div>
+      <div class="kpi highlight"><div class="label">Rendement annualisé net</div><div class="value" id="kIrr">–</div><div class="sub">Taux de rendement interne</div></div>
+    </section>
+
+    <section class="card">
+      <div class="chart-head">
+        <h2>Évolution année par année</h2>
+        <div class="legend">
+          <span><i style="background:var(--primary)"></i>Valeur du portefeuille</span>
+          <span><i style="background:var(--invested)"></i>Total investi</span>
+          <span><i style="background:var(--savings)"></i>Livret d'épargne</span>
+        </div>
+      </div>
+      <div class="chart-box" id="chartBox">
+        <canvas id="chart" role="img" aria-label="Graphique : total investi et valeur du portefeuille par année"></canvas>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+      <details class="breakdown">
+        <summary>Détail du calcul à la vente</summary>
+        <dl id="breakdown"></dl>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Trois scénarios</h2>
+      <div class="scenarios" id="scenarios"></div>
+    </section>
+
+    <section class="card">
+      <h2>Comparaison avec un livret d'épargne</h2>
+      <div class="compare" id="compare"></div>
+    </section>
+
+    <section class="card">
+      <h2>Tableau détaillé</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Année</th>
+              <th>Total investi</th>
+              <th>Valeur portefeuille</th>
+              <th>Dividendes bruts</th>
+              <th>Retenue</th>
+              <th>Frais (année)</th>
+              <th>Plus-value latente</th>
+              <th>Livret</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+          <tfoot id="tfoot"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <aside class="warning" role="note">
+      <strong>⚠️ Avertissement : simulation purement indicative.</strong>
+      Les performances passées ne garantissent pas les résultats futurs. Le rendement réel d'un investissement en actions varie fortement d'une année à l'autre et peut être négatif ; le capital investi n'est pas garanti.
+      <ul>
+        <li>Rendements supposés constants, sans volatilité ni krach.</li>
+        <li>Les minimums de commission par ordre et la TVA spécifique de chaque intermédiaire ne sont pas modélisés.</li>
+        <li>La fiscalité est simplifiée et peut évoluer : vérifiez les règles en vigueur auprès de votre intermédiaire ou d'un conseiller.</li>
+        <li>Cet outil ne constitue pas un conseil en investissement.</li>
+      </ul>
+    </aside>
+  </div>
+</main>
+
+<footer>Calculs effectués localement dans votre navigateur. Hypothèse : vente de la totalité des titres en fin de période.</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  const FIELDS = ['capital', 'monthly', 'years', 'priceRate', 'divYield', 'orderFee', 'custody',
+                  'divTax', 'cgTax', 'exemption', 'spread', 'savingsRate', 'savingsTax'];
+  const $ = (id) => document.getElementById(id);
+  const defaults = {};
+  FIELDS.forEach((f) => { defaults[f] = $(f).value; });
+
+  // ---------- Formatage ----------
+  const nf0 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
+  const nf2 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const mad = (x) => nf0.format(Math.round(x)) + ' MAD';
+  const pct = (x) => nf2.format(x * 100) + ' %';
+  const compact = (x) => {
+    const a = Math.abs(x);
+    if (a >= 1e6) return nf2.format(x / 1e6).replace(/,00$/, '') + ' M';
+    if (a >= 1e3) return nf0.format(x / 1e3) + ' k';
+    return nf0.format(x);
+  };
+  const sign = (x) => (x >= 0 ? 'pos' : 'neg');
+
+  // ---------- Lecture des paramètres ----------
+  function readNumber(id, { min = -Infinity, max = Infinity } = {}) {
+    const el = $(id);
+    const raw = el.value.trim().replace(/[\s  ]/g, '').replace(',', '.');
+    const v = raw === '' ? 0 : Number(raw);
+    const ok = Number.isFinite(v) && v >= min && v <= max;
+    el.classList.toggle('invalid', !ok);
+    el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+    return ok ? v : null;
+  }
+
+  function readParams() {
+    const p = {
+      capital: readNumber('capital', { min: 0 }),
+      monthly: readNumber('monthly', { min: 0 }),
+      years: readNumber('years', { min: 1, max: 50 }),
+      priceRate: readNumber('priceRate', { min: -50, max: 50 }),
+      divYield: readNumber('divYield', { min: 0, max: 30 }),
+      orderFee: readNumber('orderFee', { min: 0, max: 20 }),
+      custody: readNumber('custody', { min: 0 }),
+      divTax: readNumber('divTax', { min: 0, max: 100 }),
+      cgTax: readNumber('cgTax', { min: 0, max: 100 }),
+      exemption: readNumber('exemption', { min: 0 }),
+      spread: readNumber('spread', { min: 0, max: 30 }),
+      savingsRate: readNumber('savingsRate', { min: -10, max: 30 }),
+      savingsTax: readNumber('savingsTax', { min: 0, max: 100 }),
+      reinvest: $('reinvestYes').checked,
+    };
+    if (Object.values(p).some((v) => v === null)) return null;
+    p.years = Math.round(p.years);
+    ['priceRate', 'divYield', 'orderFee', 'divTax', 'cgTax', 'spread', 'savingsRate', 'savingsTax']
+      .forEach((k) => { p[k] /= 100; });
+    return p;
+  }
+
+  // ---------- Taux de rendement interne (flux mensuels) ----------
+  function irrMonthly(flows) {
+    const npv = (r) => {
+      let s = 0, d = 1;
+      for (let k = 0; k < flows.length; k++) { s += flows[k] / d; d *= 1 + r; }
+      return s;
+    };
+    let lo = -0.5, hi = 1; // bornes mensuelles (évite les dépassements numériques)
+    let fLo = npv(lo), fHi = npv(hi);
+    if (!Number.isFinite(fLo) || fLo * fHi > 0) return null;
+    for (let i = 0; i < 200; i++) {
+      const mid = (lo + hi) / 2, fMid = npv(mid);
+      if (fLo * fMid <= 0) { hi = mid; fHi = fMid; } else { lo = mid; fLo = fMid; }
+      if (hi - lo < 1e-12) break;
+    }
+    return Math.pow(1 + (lo + hi) / 2, 12) - 1;
+  }
+
+  // ---------- Moteur de simulation (pas mensuel) ----------
+  function simulate(p, priceRate) {
+    const months = p.years * 12;
+    const growth = Math.pow(1 + priceRate, 1 / 12);
+    const savGrowth = Math.pow(1 + p.savingsRate * (1 - p.savingsTax), 1 / 12);
+    const fee = p.orderFee;
+    const flows = new Array(months + 1).fill(0);
+    const savFlows = new Array(months + 1).fill(0);
+
+    let value = 0;      // valeur de marché des titres
+    let basis = 0;      // prix de revient (frais d'achat inclus)
+    let cash = 0;       // dividendes nets non réinvestis
+    let invested = 0;   // capital + versements
+    let buyFees = 0, custodyFees = 0, divTaxTotal = 0, divGrossTotal = 0;
+    let savings = 0;
+    let yearFees = 0, yearDiv = 0, yearWht = 0;
+    const rows = [{ year: 0, invested: p.capital, value: p.capital * (1 - fee), savings: p.capital }];
+
+    for (let k = 0; k < months; k++) {
+      // Versement en début de mois (capital initial au mois 0)
+      const contrib = p.monthly + (k === 0 ? p.capital : 0);
+      if (contrib > 0) {
+        const f = contrib * fee;
+        value += contrib - f;
+        basis += contrib;
+        buyFees += f; yearFees += f;
+        invested += contrib;
+        flows[k] -= contrib;
+        savings += contrib;
+        savFlows[k] -= contrib;
+      }
+      value *= growth;
+      savings *= savGrowth;
+
+      // Fin d'année : dividendes et droits de garde
+      if ((k + 1) % 12 === 0) {
+        const divGross = value * p.divYield;
+        const wht = divGross * p.divTax;
+        const divNet = divGross - wht;
+        divGrossTotal += divGross; divTaxTotal += wht;
+        yearDiv = divGross; yearWht = wht;
+        if (p.reinvest) {
+          const f = divNet * fee;
+          value += divNet - f;
+          basis += divNet;
+          buyFees += f; yearFees += f;
+        } else {
+          cash += divNet;
+        }
+        if (p.custody > 0) {
+          custodyFees += p.custody; yearFees += p.custody;
+          flows[k + 1] -= p.custody;
+        }
+        rows.push({
+          year: (k + 1) / 12,
+          invested,
+          value: value + cash,
+          div: yearDiv,
+          wht: yearWht,
+          fees: yearFees,
+          latent: value - basis,
+          savings,
+        });
+        yearFees = 0;
+      }
+    }
+
+    // Vente totale en fin de période
+    const sale = value;
+    const sellFee = sale * fee;
+    const gain = sale - sellFee - basis;
+    const exempt = sale <= p.exemption;
+    const cgt = exempt ? 0 : Math.max(0, gain) * p.cgTax;
+    const net = sale - sellFee - cgt + cash;
+    flows[months] += net;
+    savFlows[months] += savings;
+
+    // La vente apparaît dans les frais de la dernière année
+    rows[rows.length - 1].fees += sellFee;
+
+    return {
+      rows, invested, sale, cash, basis, gain, exempt, cgt, sellFee, net,
+      finalValue: sale + cash,
+      buyFees, custodyFees, divGrossTotal, divTaxTotal,
+      fees: buyFees + sellFee + custodyFees,
+      taxes: divTaxTotal + cgt,
+      irr: irrMonthly(flows),
+      savings,
+      savingsIrr: irrMonthly(savFlows),
+    };
+  }
+
+  // ---------- Rendu des indicateurs ----------
+  function renderKpis(r, p) {
+    $('kInvested').textContent = mad(r.invested);
+    $('kInvestedSub').textContent = `${mad(p.capital)} + ${nf0.format(p.years * 12)} × ${mad(p.monthly)}`;
+    $('kFinal').textContent = mad(r.finalValue);
+    $('kFinalSub').textContent = r.cash > 0 ? `dont ${mad(r.cash)} de dividendes en espèces` : 'titres valorisés au cours';
+    $('kFees').textContent = mad(r.fees);
+    $('kFeesSub').textContent = `courtage ${mad(r.buyFees + r.sellFee)} · garde ${mad(r.custodyFees)}`;
+    $('kTax').textContent = mad(r.taxes);
+    $('kTaxSub').textContent = `dividendes ${mad(r.divTaxTotal)} · plus-value ${r.exempt ? 'exonérée' : mad(r.cgt)}`;
+    $('kNet').textContent = mad(r.net);
+    const g = r.net - r.invested - r.custodyFees;
+    $('kNetSub').textContent = `gain net ${g >= 0 ? '+' : ''}${mad(g)}`;
+    $('kIrr').textContent = r.irr === null ? '–' : pct(r.irr);
+
+    $('breakdown').innerHTML = `
+      <dt>Valeur des titres vendus</dt><dd>${mad(r.sale)}</dd>
+      <dt>Frais de vente (${nf2.format(p.orderFee * 100)} %)</dt><dd>− ${mad(r.sellFee)}</dd>
+      <dt>Prix de revient (frais d'achat inclus)</dt><dd>${mad(r.basis)}</dd>
+      <dt>Plus-value imposable</dt><dd>${mad(Math.max(0, r.gain))}</dd>
+      <dt>Impôt sur la plus-value</dt><dd>${r.exempt ? `exonéré (ventes ≤ ${mad(p.exemption)})` : '− ' + mad(r.cgt)}</dd>
+      ${r.cash > 0 ? `<dt>Dividendes nets en espèces</dt><dd>+ ${mad(r.cash)}</dd>` : ''}
+      <dt><strong>Valeur nette encaissée</strong></dt><dd><strong>${mad(r.net)}</strong></dd>
+      ${r.custodyFees > 0 ? `<dt>Droits de garde payés à part</dt><dd>${mad(r.custodyFees)}</dd>` : ''}`;
+  }
+
+  function renderTable(r) {
+    let html = '';
+    for (const row of r.rows.slice(1)) {
+      html += `<tr>
+        <td>${row.year}</td>
+        <td>${mad(row.invested)}</td>
+        <td>${mad(row.value)}</td>
+        <td>${mad(row.div)}</td>
+        <td>${mad(row.wht)}</td>
+        <td>${mad(row.fees)}</td>
+        <td class="${sign(row.latent)}">${mad(row.latent)}</td>
+        <td>${mad(row.savings)}</td>
+      </tr>`;
+    }
+    $('tbody').innerHTML = html;
+    $('tfoot').innerHTML = `<tr>
+      <td>Total</td>
+      <td>${mad(r.invested)}</td>
+      <td>${mad(r.finalValue)}</td>
+      <td>${mad(r.divGrossTotal)}</td>
+      <td>${mad(r.divTaxTotal)}</td>
+      <td>${mad(r.fees)}</td>
+      <td></td>
+      <td>${mad(r.savings)}</td>
+    </tr>`;
+  }
+
+  function renderScenarios(p) {
+    const list = [
+      { name: 'Prudent', rate: p.priceRate - p.spread, cls: '' },
+      { name: 'Moyen', rate: p.priceRate, cls: 'mid' },
+      { name: 'Optimiste', rate: p.priceRate + p.spread, cls: '' },
+    ];
+    $('scenarios').innerHTML = list.map((s) => {
+      const r = simulate(p, s.rate);
+      const g = r.net - r.invested - r.custodyFees;
+      return `<div class="scenario ${s.cls}">
+        <h3>${s.name}</h3>
+        <div class="rate">Cours ${pct(s.rate)}/an + dividende ${pct(p.divYield)}</div>
+        <div class="big">${mad(r.net)}</div>
+        <dl>
+          <dt>Gain net</dt><dd class="${sign(g)}">${g >= 0 ? '+' : ''}${mad(g)}</dd>
+          <dt>Rendement net</dt><dd>${r.irr === null ? '–' : pct(r.irr)}</dd>
+          <dt>Impôts</dt><dd>${mad(r.taxes)}</dd>
+        </dl>
+      </div>`;
+    }).join('');
+  }
+
+  function renderCompare(r, p) {
+    const diff = r.net - r.savings;
+    const netRate = p.savingsRate * (1 - p.savingsTax);
+    $('compare').innerHTML = `
+      <div class="box">
+        <div class="label">Bourse (net après vente et impôts)</div>
+        <div class="big">${mad(r.net)}</div>
+        <div class="label">Rendement annualisé : ${r.irr === null ? '–' : pct(r.irr)}</div>
+      </div>
+      <div class="box">
+        <div class="label">Livret d'épargne (mêmes versements)</div>
+        <div class="big">${mad(r.savings)}</div>
+        <div class="label">Taux net : ${pct(netRate)} (${pct(p.savingsRate)} brut − ${nf0.format(p.savingsTax * 100)} % d'impôt)</div>
+      </div>
+      <div class="verdict">
+        ${diff >= 0
+          ? `Dans ce scénario, la Bourse rapporterait <strong class="pos">${mad(diff)} de plus</strong> que le livret au bout de ${p.years} an${p.years > 1 ? 's' : ''}, en contrepartie d'un risque de perte en capital.`
+          : `Dans ce scénario, le livret rapporterait <strong class="neg">${mad(-diff)} de plus</strong> que la Bourse au bout de ${p.years} an${p.years > 1 ? 's' : ''}.`}
+      </div>`;
+  }
+
+  // ---------- Graphique (canvas) ----------
+  const canvas = $('chart'), box = $('chartBox'), tooltip = $('tooltip');
+  let chartData = null, hoverIndex = -1, geom = null;
+
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function niceStep(max, ticks) {
+    const raw = max / ticks;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / mag;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+  }
+
+  function drawChart() {
+    if (!chartData) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = box.clientWidth, H = box.clientHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const rows = chartData;
+    const n = rows.length - 1;
+    const maxV = Math.max(1, ...rows.map((r) => Math.max(r.value, r.invested, r.savings)));
+    const step = niceStep(maxV, W < 500 ? 4 : 5);
+    const top = Math.ceil(maxV / step) * step;
+
+    ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+    const labelW = Math.max(...Array.from({ length: Math.round(top / step) + 1 }, (_, i) => ctx.measureText(compact(i * step)).width));
+    const pad = { l: labelW + 14, r: 12, t: 12, b: 28 };
+    const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+    const x = (i) => pad.l + (n === 0 ? 0 : (i / n) * pw);
+    const y = (v) => pad.t + ph - (v / top) * ph;
+    geom = { pad, pw, n, x };
+
+    const muted = cssVar('--muted'), border = cssVar('--border');
+    const cPrimary = cssVar('--primary'), cInvested = cssVar('--invested'), cSavings = cssVar('--savings');
+
+    // Grille et axe Y
+    ctx.strokeStyle = border; ctx.lineWidth = 1; ctx.fillStyle = muted;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let v = 0; v <= top + 1e-9; v += step) {
+      const yy = Math.round(y(v)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(W - pad.r, yy); ctx.stroke();
+      ctx.fillText(compact(v), pad.l - 8, yy);
+    }
+    // Axe X
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(pw / 46))));
+    for (let i = 0; i <= n; i += every) ctx.fillText(String(rows[i].year), x(i), H - pad.b + 8);
+    if (n % every !== 0) ctx.fillText(String(rows[n].year), x(n), H - pad.b + 8);
+
+    // Aire sous la courbe du portefeuille
+    const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ph);
+    grad.addColorStop(0, hexAlpha(cPrimary, 0.28));
+    grad.addColorStop(1, hexAlpha(cPrimary, 0.02));
+    ctx.beginPath();
+    rows.forEach((r, i) => (i ? ctx.lineTo(x(i), y(r.value)) : ctx.moveTo(x(i), y(r.value))));
+    ctx.lineTo(x(n), y(0)); ctx.lineTo(x(0), y(0)); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    const line = (key, color, width, dash) => {
+      ctx.beginPath();
+      rows.forEach((r, i) => (i ? ctx.lineTo(x(i), y(r[key])) : ctx.moveTo(x(i), y(r[key]))));
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+      ctx.lineJoin = 'round'; ctx.stroke(); ctx.setLineDash([]);
+    };
+    line('savings', cSavings, 2, [5, 4]);
+    line('invested', cInvested, 2);
+    line('value', cPrimary, 3);
+
+    // Survol
+    if (hoverIndex >= 0 && hoverIndex <= n) {
+      const r = rows[hoverIndex], xx = x(hoverIndex);
+      ctx.strokeStyle = muted; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(xx, pad.t); ctx.lineTo(xx, pad.t + ph); ctx.stroke(); ctx.setLineDash([]);
+      [['savings', cSavings], ['invested', cInvested], ['value', cPrimary]].forEach(([k, c]) => {
+        ctx.beginPath(); ctx.arc(xx, y(r[k]), 4, 0, Math.PI * 2);
+        ctx.fillStyle = cssVar('--card'); ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = c; ctx.stroke();
+      });
+      tooltip.innerHTML = `<b>Année ${r.year}</b>
+        <div class="tt-row"><i style="background:${cPrimary}"></i>Portefeuille : ${mad(r.value)}</div>
+        <div class="tt-row"><i style="background:${cInvested}"></i>Investi : ${mad(r.invested)}</div>
+        <div class="tt-row"><i style="background:${cSavings}"></i>Livret : ${mad(r.savings)}</div>`;
+      tooltip.style.opacity = '1';
+      const tw = tooltip.offsetWidth;
+      let left = xx + 12;
+      if (left + tw > W) left = xx - tw - 12;
+      tooltip.style.left = Math.max(0, left) + 'px';
+      tooltip.style.top = Math.max(0, y(r.value) - 60) + 'px';
+    } else {
+      tooltip.style.opacity = '0';
+    }
+  }
+
+  function hexAlpha(color, a) {
+    const m = color.match(/^#([0-9a-f]{6})$/i);
+    if (!m) return color;
+    const v = parseInt(m[1], 16);
+    return `rgba(${v >> 16}, ${(v >> 8) & 255}, ${v & 255}, ${a})`;
+  }
+
+  function pointerMove(clientX) {
+    if (!geom) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const i = geom.n === 0 ? 0 : Math.round(((px - geom.pad.l) / geom.pw) * geom.n);
+    const idx = Math.min(geom.n, Math.max(0, i));
+    if (idx !== hoverIndex) { hoverIndex = idx; drawChart(); }
+  }
+  canvas.addEventListener('mousemove', (e) => pointerMove(e.clientX));
+  canvas.addEventListener('mouseleave', () => { hoverIndex = -1; drawChart(); });
+  canvas.addEventListener('touchstart', (e) => pointerMove(e.touches[0].clientX), { passive: true });
+  canvas.addEventListener('touchmove', (e) => pointerMove(e.touches[0].clientX), { passive: true });
+
+  // ---------- Mise à jour ----------
+  function update() {
+    const p = readParams();
+    if (!p) return;
+    const r = simulate(p, p.priceRate);
+    renderKpis(r, p);
+    renderTable(r);
+    renderScenarios(p);
+    renderCompare(r, p);
+    chartData = r.rows;
+    hoverIndex = -1;
+    drawChart();
+  }
+
+  $('form').addEventListener('input', update);
+  $('form').addEventListener('change', update);
+  $('reset').addEventListener('click', () => {
+    FIELDS.forEach((f) => { $(f).value = defaults[f]; });
+    $('reinvestYes').checked = true;
+    update();
+  });
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(drawChart, 80); });
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    (mq.addEventListener ? mq.addEventListener('change', drawChart) : mq.addListener(drawChart));
+  }
+
+  update();
+})();
+</script>
+</body>
+</html>
